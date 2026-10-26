@@ -23,7 +23,7 @@ else:
     from .services import analyse_job
     from .email_service import EmailService
 
-from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, UploadFile, status
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.openapi.utils import get_openapi
@@ -33,7 +33,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session, selectinload
 from datetime import datetime
 
-app = FastAPI(title="HireSense AI API", version="1.0.0", docs_url=None)
+app = FastAPI(title="RecruitAI API", version="1.0.0", docs_url=None)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://localhost:8443", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:8443"],
@@ -226,7 +226,14 @@ def _export_candidate_fields(candidate) -> dict:
     }
 
 
-def build_report_workbook(analysis: Analysis) -> Workbook:
+def _add_resume_link(cell, candidate, base_url: str) -> None:
+    """Add a clickable link to the resume download route for this candidate."""
+    cell.value = "Open resume"
+    cell.hyperlink = f"{base_url.rstrip('/')}/api/v1/candidates/{candidate.id}/resume"
+    cell.style = "Hyperlink"
+
+
+def build_report_workbook(analysis: Analysis, base_url: str = "http://localhost:8000") -> Workbook:
     workbook = Workbook()
     summary = workbook.active
     summary.title = "Summary"
@@ -241,27 +248,30 @@ def build_report_workbook(analysis: Analysis) -> Workbook:
         req_text = ", ".join(analysis.requirements or [])
     summary.append(["Requirements", req_text])
     summary.append([])
-    summary.append(["Candidate", "Email", "Phone", "Location", "Education", "Top Skills"])
+    summary.append(["Candidate", "Email", "Phone", "Location", "Education", "Top Skills", "Resume"])
     for candidate in sorted(analysis.candidates, key=lambda item: item.overall_score, reverse=True):
         contact_fields = _export_candidate_fields(candidate)
-        summary.append([
+        row = [
             candidate.name,
             contact_fields["email"],
             contact_fields["phone"],
             contact_fields["location"],
             contact_fields["education"],
             ", ".join(candidate.skills[:8]),
-        ])
+            "",
+        ]
+        summary.append(row)
+        _add_resume_link(summary.cell(summary.max_row, 7), candidate, base_url)
 
     ranking = workbook.create_sheet("Candidate ranking")
     ranking.append([
         "Rank", "Candidate", "Email", "Overall", "Semantic", "Keyword", "Experience",
-        "Recommendation", "Skills", "Missing skills", "Insight"
+        "Recommendation", "Skills", "Missing skills", "Insight", "Resume"
     ])
 
     for rank, candidate in enumerate(sorted(analysis.candidates, key=lambda item: item.overall_score, reverse=True), 1):
         contact_fields = _export_candidate_fields(candidate)
-        ranking.append([
+        row = [
             rank,
             candidate.name,
             contact_fields["email"],
@@ -273,18 +283,21 @@ def build_report_workbook(analysis: Analysis) -> Workbook:
             ", ".join(candidate.skills),
             ", ".join(candidate.missing_skills),
             candidate.insight,
-        ])
+            "",
+        ]
+        ranking.append(row)
+        _add_resume_link(ranking.cell(ranking.max_row, 12), candidate, base_url)
 
     details = workbook.create_sheet("Candidate details")
     details.append([
         "Rank", "Candidate", "Email", "Phone", "Overall", "Semantic", "Keyword", "Experience",
         "Recommendation", "Experience years", "Education", "Skills", "Missing skills",
-        "Projects", "Experience details", "Organizations", "Locations", "Insight"
+        "Projects", "Experience details", "Organizations", "Locations", "Insight", "Resume"
     ])
     for rank, candidate in enumerate(sorted(analysis.candidates, key=lambda item: item.overall_score, reverse=True), 1):
         entities = getattr(candidate, "entities", {}) or {}
         contact_fields = _export_candidate_fields(candidate)
-        details.append([
+        row = [
             rank,
             candidate.name,
             contact_fields["email"],
@@ -303,7 +316,10 @@ def build_report_workbook(analysis: Analysis) -> Workbook:
             _to_export_string(entities.get("organizations") or []),
             contact_fields["location"],
             getattr(candidate, "insight", ""),
-        ])
+            "",
+        ]
+        details.append(row)
+        _add_resume_link(details.cell(details.max_row, 19), candidate, base_url)
 
     for sheet in workbook.worksheets:
         sheet.freeze_panes = "A2"
@@ -370,12 +386,15 @@ def get_analysis_status(analysis_id: str, db: Session = Depends(get_db)):
 
 
 @app.get("/api/v1/analyses/{analysis_id}/report.xlsx")
-def download_report(analysis_id: str, db: Session = Depends(get_db)):
+def download_report(analysis_id: str, request: Request, db: Session = Depends(get_db)):
     analysis = db.scalar(select(Analysis).options(selectinload(Analysis.candidates)).where(Analysis.id == analysis_id))
     if not analysis: raise HTTPException(404, "Analysis not found.")
     if analysis.status != "completed": raise HTTPException(409, "Analysis is not complete.")
 
-    workbook = build_report_workbook(analysis)
+    base_url = str(request.base_url).rstrip("/")
+    if request.url.hostname in {"localhost", "127.0.0.1"}:
+        base_url = f"{request.url.scheme}://{request.url.hostname}:8000"
+    workbook = build_report_workbook(analysis, base_url)
     from io import BytesIO
     buffer = BytesIO(); workbook.save(buffer); buffer.seek(0)
     return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f'attachment; filename="hiresense-ai-{analysis_id}.xlsx"'})
@@ -574,7 +593,7 @@ def send_email_to_candidates(email_request: SendEmailIn, db: Session = Depends(g
             template = EmailService.get_rejection_email_template(candidate.name)
         elif email_request.template_type == "custom":
             template = {
-                "subject": email_request.custom_subject or "Message from HireSense AI",
+                "subject": email_request.custom_subject or "Message from RecruitAI",
                 "body": email_request.custom_body or "",
                 "html_body": email_request.custom_html_body
             }
@@ -658,7 +677,7 @@ def schedule_call(candidate_id: str, call_request: CallProcedureIn, db: Session 
 
 
 @app.get("/api/v1/analyses/{analysis_id}/shortlisted-report.xlsx")
-def download_shortlisted_report(analysis_id: str, db: Session = Depends(get_db)):
+def download_shortlisted_report(analysis_id: str, request: Request, db: Session = Depends(get_db)):
     """Download Excel report of only shortlisted candidates."""
     analysis = db.scalar(select(Analysis).options(selectinload(Analysis.candidates)).where(Analysis.id == analysis_id))
     if not analysis:
@@ -676,7 +695,7 @@ def download_shortlisted_report(analysis_id: str, db: Session = Depends(get_db))
     # Headers
     sheet.append([
         "Rank", "Candidate", "Email", "Phone", "Overall Score", "Semantic", "Keyword", "Experience",
-        "Recommendation", "Education", "Skills", "Missing Skills", "Experience Years", "Location"
+        "Recommendation", "Education", "Skills", "Missing Skills", "Experience Years", "Location", "Resume"
     ])
     
     # Data rows
@@ -684,7 +703,7 @@ def download_shortlisted_report(analysis_id: str, db: Session = Depends(get_db))
         contact_fields = _export_candidate_fields(candidate)
         entities = getattr(candidate, "entities", {}) or {}
         
-        sheet.append([
+        row = [
             rank,
             candidate.name,
             contact_fields["email"],
@@ -699,7 +718,13 @@ def download_shortlisted_report(analysis_id: str, db: Session = Depends(get_db))
             ", ".join(candidate.missing_skills),
             entities.get("experience_years", ""),
             contact_fields["location"],
-        ])
+            "",
+        ]
+        sheet.append(row)
+        base_url = str(request.base_url).rstrip("/")
+        if request.url.hostname in {"localhost", "127.0.0.1"}:
+            base_url = f"{request.url.scheme}://{request.url.hostname}:8000"
+        _add_resume_link(sheet.cell(sheet.max_row, 15), candidate, base_url)
     
     # Format sheet
     sheet.freeze_panes = "A2"

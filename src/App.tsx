@@ -7,7 +7,7 @@ import Overview from './screens/Overview'
 import CandidateAnalysis from './screens/CandidateAnalysis'
 import ShortlistedCandidates from './screens/ShortlistedCandidates'
 import EmailPage from './screens/EmailPage'
-import { createAnalysis, pollAnalysis, downloadReport, type AnalysisResponse } from './utils/api'
+import { createAnalysis, pollAnalysis, type AnalysisResponse } from './utils/api'
 import { convertToCandidate } from './data/candidates'
 
 type Screen = 'analysis' | 'scanning' | 'overview' | 'candidate' | 'shortlisted' | 'email'
@@ -73,23 +73,6 @@ export default function App() {
 
   const handleBack = () => setScreen('overview')
 
-  const handleExportReport = async () => {
-    if (!currentAnalysis) return
-    try {
-      const blob = await downloadReport(currentAnalysis.id)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `hiresense-ai-${currentAnalysis.id}.xlsx`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    } catch (error) {
-      console.error('Failed to download report:', error)
-    }
-  }
-
   if (screen === 'analysis') {
     return <NewAnalysis onAnalyze={handleAnalyze} />
   }
@@ -116,7 +99,7 @@ export default function App() {
         onNewAnalysis={handleNewAnalysis}
       />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <TopBar onNewAnalysis={handleNewAnalysis} onExportReport={handleExportReport} currentAnalysis={currentAnalysis} />
+        <TopBar onNewAnalysis={handleNewAnalysis} currentAnalysis={currentAnalysis} />
         <main className="flex-1 overflow-y-auto min-h-0 p-8">
           {screen === 'overview' && (
             <Overview

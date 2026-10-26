@@ -19,7 +19,7 @@ export function generateExcelReport() {
 
   // Sheet 2: Candidate Ranking
   const rankingData = [
-    ['Rank', 'Candidate', 'Match Score', 'Semantic Score', 'Skill Score', 'Experience Score', 'Recommendation'],
+    ['Rank', 'Candidate', 'Match Score', 'Semantic Score', 'Skill Score', 'Experience Score', 'Recommendation', 'Resume'],
     ...CANDIDATES.map((c, idx) => [
       idx + 1,
       c.name,
@@ -28,6 +28,7 @@ export function generateExcelReport() {
       c.skillMatch,
       c.experienceMatch,
       c.recommendation,
+      'Not available in sample report',
     ]),
   ]
   const rankingWs = XLSX.utils.aoa_to_sheet(rankingData)
@@ -43,7 +44,7 @@ export function generateExcelReport() {
 
   // Sheet 4: Candidate Details
   const detailsData = [
-    ['Candidate', 'Education', 'Experience', 'Matching Skills', 'Missing Skills', 'Match Score', 'AI Recommendation'],
+    ['Candidate', 'Education', 'Experience', 'Matching Skills', 'Missing Skills', 'Match Score', 'AI Recommendation', 'Resume'],
     ...CANDIDATES.map(c => [
       c.name,
       c.education,
@@ -52,6 +53,7 @@ export function generateExcelReport() {
       c.missingSkills.join(', '),
       c.match,
       c.recommendation,
+      'Not available in sample report',
     ]),
   ]
   const detailsWs = XLSX.utils.aoa_to_sheet(detailsData)

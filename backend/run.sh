@@ -1,9 +1,9 @@
 #!/bin/bash
-# Backend startup script for HireSense AI
+# Backend startup script for RecruitAI
 
 set -e
 
-echo "🚀 HireSense AI Backend Startup"
+echo "🚀 RecruitAI Backend Startup"
 echo "================================"
 
 # Navigate to backend directory

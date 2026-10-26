@@ -109,7 +109,7 @@ def send_email_to_candidates(email_request: SendEmailIn, db: Session = Depends(g
             template = EmailService.get_rejection_email_template(candidate.name)
         elif email_request.template_type == "custom":
             template = {
-                "subject": email_request.custom_subject or "Message from HireSense AI",
+                "subject": email_request.custom_subject or "Message from RecruitAI",
                 "body": email_request.custom_body or "",
                 "html_body": email_request.custom_html_body
             }

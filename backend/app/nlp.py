@@ -1703,7 +1703,14 @@ def extract_resume_data_ollama(raw_text: str, pdf_path: str) -> Dict:
         import json
         
         preprocessed_text = preprocess_resume_text(raw_text)
-        truncated_text = preprocessed_text[:4000]
+        # Keep the beginning and end: contact/header data is at the top, while
+        # employment history and education often follow beyond the first 4k chars.
+        max_chars = 12000
+        if len(preprocessed_text) > max_chars:
+            half = max_chars // 2
+            truncated_text = preprocessed_text[:half] + "\n\n[Middle of resume omitted]\n\n" + preprocessed_text[-half:]
+        else:
+            truncated_text = preprocessed_text
         
         schema = ResumeExtractionSchema.model_json_schema()
         
@@ -1797,8 +1804,10 @@ Return valid JSON matching the provided schema."""
                 except Exception:
                     pass
                     
-        # Do NOT merge with dates extracted from raw text to prevent capturing education/project dates.
-        # Use structured LLM data exclusively if available.
+        # If the structured parser missed date ranges, use the section-aware rule
+        # parser as a fallback. It limits dates to employment sections where possible.
+        if not all_date_ranges:
+            all_date_ranges = extract_work_dates(raw_text)
         
         total_exp_years = calculate_total_experience(all_date_ranges)
         
@@ -1842,7 +1851,8 @@ Return valid JSON matching the provided schema."""
             "education": highest_edu or "Not specified",
             "skills": sorted(normalized_skills),
             "work_experience": work_exp_list,
-            "notable_projects": projects_list
+            "notable_projects": projects_list,
+            "entities": contact_entities,
         }
         
     except Exception as e:

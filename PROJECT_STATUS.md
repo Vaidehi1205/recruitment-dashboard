@@ -1,4 +1,4 @@
-# HireSense AI - Project Status
+# RecruitAI - Project Status
 
 ## ✅ Current Status: FULLY FUNCTIONAL
 

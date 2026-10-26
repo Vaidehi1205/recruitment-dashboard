@@ -1,6 +1,6 @@
 Create a polished, production-quality desktop web application called:
 
-"HireSense AI"
+"RecruitAI"
 
 This is a focused AI recruitment dashboard for recruiters. It allows a recruiter to:
 
@@ -145,7 +145,7 @@ SCREEN 1 — NEW ANALYSIS
 Create a welcoming analysis setup screen.
 
 Header:
-"HireSense AI"
+"RecruitAI"
 
 Subtitle:
 "Analyze and rank candidates using AI-powered resume matching."

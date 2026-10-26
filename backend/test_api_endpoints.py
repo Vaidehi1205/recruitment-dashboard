@@ -1,5 +1,5 @@
 """
-Dedicated End-to-End API Endpoint Test Suite for HireSense AI (RecruitAI) Backend.
+Dedicated End-to-End API Endpoint Test Suite for RecruitAI (RecruitAI) Backend.
 
 Communicates over HTTP with the running FastAPI server at http://127.0.0.1:8000.
 Does not import service functions directly for endpoint testing.
@@ -30,7 +30,7 @@ RESUMES_DIR = Path(__file__).resolve().parent.parent / "Resumes"
 
 def run_tests():
     print("=" * 80)
-    print("HireSense AI Backend - Dedicated End-to-End API Endpoint Test Suite")
+    print("RecruitAI Backend - Dedicated End-to-End API Endpoint Test Suite")
     print("=" * 80)
     print(f"Target Server: {BASE_URL}")
 
